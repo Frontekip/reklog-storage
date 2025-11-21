@@ -3,9 +3,6 @@
   "version": "0.0.1",
   "description": "Simple MongoDB wrapper for RekLog Storage - Connect to dedicated MongoDB instances",
   "main": "src/index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "keywords": [
     "mongodb",
     "storage",
@@ -13,17 +10,17 @@
     "reklog",
     "wrapper"
   ],
-  "author": "RekLog",
+  "author": "Yaşar İçli <yasaricli@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "mongodb": "^4.17.2"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/reklog/reklog-storage"
+    "url": "https://github.com/frontekip/reklog-storage"
   },
   "bugs": {
-    "url": "https://github.com/reklog/reklog-storage/issues"
+    "url": "https://github.com/frontekip/reklog-storage/issues"
   },
   "homepage": "https://reklog.com"
 }
