@@ -1,6 +1,6 @@
 {
   "name": "reklog-storage",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Simple and secure API client for RekLog Storage - Access your dedicated database instances with API keys",
   "main": "src/index.js",
   "keywords": [
