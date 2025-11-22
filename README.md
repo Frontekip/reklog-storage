@@ -1,6 +1,6 @@
 # RekLog Storage
 
-Simple MongoDB wrapper for RekLog Storage - Connect to dedicated MongoDB instances with ease.
+Simple and secure API client for RekLog Storage - Access your dedicated database instances with API keys.
 
 ## Installation
 
@@ -19,260 +19,260 @@ yarn add reklog-storage
 ```javascript
 const RekLogStorage = require('reklog-storage');
 
-// Initialize with your connection string
-const storage = new RekLogStorage('mongodb://username:password@host:port/database?authSource=admin');
+// Initialize with your API key (auto-validates)
+const storage = new RekLogStorage('your-api-key-here');
 
-// Connect
-await storage.connect();
-
-// Insert a document
+// Insert documents
 await storage.insert('users', {
-  name: 'John Doe',
-  email: 'john@example.com'
+  username: 'john_doe',
+  email: 'john@example.com',
+  age: 30
 });
 
-// Find documents
-const users = await storage.find('users', {});
+// Get documents
+const users = await storage.get('users', { status: 'active' });
 
-// Disconnect when done
-await storage.disconnect();
+// Update documents
+await storage.update('users',
+  { username: 'john_doe' },
+  { $set: { age: 31 } }
+);
+
+// Delete documents
+await storage.delete('users', { status: 'inactive' });
 ```
+
+## Features
+
+- 🔐 **API Key Authentication** - Secure access with API keys
+- ✨ **Auto-Validation** - API key validated automatically on initialization
+- 🚀 **Simple API** - No connection management needed
+- 📦 **Full CRUD** - Create, Read, Update, Delete operations
+- 🔍 **MongoDB Query Syntax** - Use familiar MongoDB queries
+- 🎯 **Promise-Based** - Modern async/await support
 
 ## API Reference
 
 ### Constructor
 
 ```javascript
-new RekLogStorage(connectionString, options)
+new RekLogStorage(apiKey, options)
 ```
 
-- `connectionString` (string, required): MongoDB connection string
-- `options` (object, optional): MongoDB client options
+**Parameters:**
+- `apiKey` (string, required): Your storage API key from RekLog dashboard
+- `options` (object, optional):
+  - `apiUrl` (string): Custom API URL (default: `https://api.reklog.com/api`)
 
-### Connection Methods
-
-#### `connect()`
-
-Connect to MongoDB database.
-
+**Example:**
 ```javascript
-await storage.connect();
+// With default API URL
+const storage = new RekLogStorage('your-api-key-here');
+
+// With custom API URL
+const storage = new RekLogStorage('your-api-key-here', {
+  apiUrl: 'https://api.reklog.com/api'
+});
 ```
 
-#### `disconnect()`
+### Get Operations
 
-Disconnect from MongoDB database.
+#### `get(collection, query, options)`
 
+Get documents matching a query.
+
+**Parameters:**
+- `collection` (string): Collection name
+- `query` (object): MongoDB query filter (default: `{}`)
+- `options` (object, optional):
+  - `limit` (number): Maximum number of documents
+  - `skip` (number): Number of documents to skip
+  - `sort` (object): Sort order (e.g., `{ createdAt: -1 }`)
+  - `projection` (object): Fields to include/exclude
+
+**Returns:** `Promise<Array>` - Array of documents
+
+**Examples:**
 ```javascript
-await storage.disconnect();
+// Get all active users
+const activeUsers = await storage.get('users', { status: 'active' });
+
+// Get with pagination
+const users = await storage.get('users', {}, {
+  limit: 10,
+  skip: 20,
+  sort: { createdAt: -1 }
+});
+
+// Get with projection (only specific fields)
+const usernames = await storage.get('users', {}, {
+  projection: { username: 1, email: 1 }
+});
+
+// Complex queries
+const users = await storage.get('users', {
+  age: { $gte: 18, $lte: 65 },
+  status: 'active'
+});
+```
+
+#### `getAll(collection, options)`
+
+Get all documents from a collection.
+
+**Parameters:**
+- `collection` (string): Collection name
+- `options` (object, optional): Same as `get()` options
+
+**Returns:** `Promise<Array>` - Array of all documents
+
+**Example:**
+```javascript
+// Get all users
+const allUsers = await storage.getAll('users');
+
+// Get all with limit
+const first100 = await storage.getAll('users', { limit: 100 });
 ```
 
 ### Insert Operations
 
-#### `insert(collectionName, document)`
+#### `insert(collection, documents)`
 
-Insert a single document.
+Insert one or multiple documents.
 
+**Parameters:**
+- `collection` (string): Collection name
+- `documents` (object | array): Document(s) to insert
+
+**Returns:**
+- Single document: `Promise<{ insertedId: ObjectId }>`
+- Multiple documents: `Promise<{ insertedCount: number, insertedIds: Object }>`
+
+**Examples:**
 ```javascript
-const user = await storage.insert('users', {
-  name: 'John Doe',
+// Insert single document
+const result = await storage.insert('users', {
+  username: 'john_doe',
   email: 'john@example.com',
-  age: 30
+  age: 30,
+  createdAt: new Date()
 });
-// Returns: { _id: ObjectId('...'), name: 'John Doe', ... }
-```
+console.log(result.insertedId);
 
-#### `insertMany(collectionName, documents)`
-
-Insert multiple documents.
-
-```javascript
-const users = await storage.insertMany('users', [
-  { name: 'John Doe', email: 'john@example.com' },
-  { name: 'Jane Smith', email: 'jane@example.com' }
-]);
-```
-
-### Find Operations
-
-#### `find(collectionName, query, options)`
-
-Find documents matching query.
-
-```javascript
-// Find all users
-const allUsers = await storage.find('users', {});
-
-// Find with filter
-const activeUsers = await storage.find('users', { status: 'active' });
-
-// Find with options
-const users = await storage.find('users', {}, {
-  sort: { createdAt: -1 },
-  limit: 10,
-  skip: 0,
-  projection: { name: 1, email: 1 }
-});
-```
-
-**Options:**
-- `sort`: Sort order (e.g., `{ createdAt: -1 }`)
-- `limit`: Maximum number of documents
-- `skip`: Number of documents to skip
-- `projection`: Fields to include/exclude
-
-#### `findOne(collectionName, query, options)`
-
-Find a single document.
-
-```javascript
-const user = await storage.findOne('users', { email: 'john@example.com' });
-```
-
-#### `findById(collectionName, id)`
-
-Find document by ID.
-
-```javascript
-const user = await storage.findById('users', '507f1f77bcf86cd799439011');
+// Insert multiple documents
+const users = [
+  { username: 'user1', email: 'user1@example.com' },
+  { username: 'user2', email: 'user2@example.com' },
+  { username: 'user3', email: 'user3@example.com' }
+];
+const result = await storage.insert('users', users);
+console.log(`Inserted ${result.insertedCount} users`);
 ```
 
 ### Update Operations
 
-#### `update(collectionName, query, update, options)`
+#### `update(collection, query, update)`
 
-Update multiple documents.
+Update documents matching a query.
 
+**Parameters:**
+- `collection` (string): Collection name
+- `query` (object): MongoDB query filter
+- `update` (object): Update operations (e.g., `{ $set: { field: value } }`)
+
+**Returns:** `Promise<{ matchedCount: number, modifiedCount: number }>`
+
+**Examples:**
 ```javascript
-const result = await storage.update(
-  'users',
+// Update with $set
+const result = await storage.update('users',
   { status: 'inactive' },
-  { $set: { status: 'active' } }
+  { $set: { status: 'active', updatedAt: new Date() } }
 );
-// Returns: { matchedCount: 5, modifiedCount: 5 }
-```
+console.log(`Updated ${result.modifiedCount} users`);
 
-#### `updateOne(collectionName, query, update, options)`
-
-Update a single document.
-
-```javascript
-await storage.updateOne(
-  'users',
-  { email: 'john@example.com' },
-  { $set: { name: 'John Smith' } }
+// Update with $inc (increment)
+await storage.update('users',
+  { age: { $lt: 18 } },
+  { $inc: { age: 1 } }
 );
-```
 
-#### `updateById(collectionName, id, update)`
+// Update with $push (add to array)
+await storage.update('users',
+  { username: 'john_doe' },
+  { $push: { tags: 'verified' } }
+);
 
-Update document by ID.
-
-```javascript
-await storage.updateById(
-  'users',
-  '507f1f77bcf86cd799439011',
-  { $set: { age: 31 } }
+// Update with $unset (remove field)
+await storage.update('users',
+  { tempField: { $exists: true } },
+  { $unset: { tempField: '' } }
 );
 ```
 
 ### Delete Operations
 
-#### `delete(collectionName, query)`
+#### `delete(collection, query)`
 
-Delete multiple documents.
+Delete documents matching a query.
 
+**Parameters:**
+- `collection` (string): Collection name
+- `query` (object): MongoDB query filter
+
+**Returns:** `Promise<{ deletedCount: number }>`
+
+**Examples:**
 ```javascript
-const deletedCount = await storage.delete('users', { status: 'inactive' });
-// Returns: 3 (number of deleted documents)
+// Delete inactive users
+const result = await storage.delete('users', { status: 'inactive' });
+console.log(`Deleted ${result.deletedCount} users`);
+
+// Delete specific users
+await storage.delete('users', {
+  username: { $in: ['user1', 'user2', 'user3'] }
+});
+
+// Delete users older than date
+await storage.delete('users', {
+  createdAt: { $lt: new Date('2024-01-01') }
+});
 ```
 
-#### `deleteOne(collectionName, query)`
+## MongoDB Query Operators
 
-Delete a single document.
+RekLog Storage supports MongoDB query operators:
 
+### Comparison
+- `$eq` - Equal to
+- `$ne` - Not equal to
+- `$gt` - Greater than
+- `$gte` - Greater than or equal
+- `$lt` - Less than
+- `$lte` - Less than or equal
+- `$in` - In array
+- `$nin` - Not in array
+
+### Logical
+- `$and` - Logical AND
+- `$or` - Logical OR
+- `$not` - Logical NOT
+- `$nor` - Logical NOR
+
+### Element
+- `$exists` - Field exists
+- `$type` - Field type
+
+### Array
+- `$all` - All elements match
+- `$elemMatch` - Element matches
+- `$size` - Array size
+
+**Example:**
 ```javascript
-const deletedCount = await storage.deleteOne('users', { email: 'john@example.com' });
-```
-
-#### `deleteById(collectionName, id)`
-
-Delete document by ID.
-
-```javascript
-await storage.deleteById('users', '507f1f77bcf86cd799439011');
-```
-
-### Aggregation & Advanced
-
-#### `count(collectionName, query)`
-
-Count documents.
-
-```javascript
-const userCount = await storage.count('users', { status: 'active' });
-```
-
-#### `aggregate(collectionName, pipeline)`
-
-Run aggregation pipeline.
-
-```javascript
-const stats = await storage.aggregate('orders', [
-  { $match: { status: 'completed' } },
-  {
-    $group: {
-      _id: '$userId',
-      total: { $sum: '$amount' }
-    }
-  },
-  { $sort: { total: -1 } }
-]);
-```
-
-#### `createIndex(collectionName, keys, options)`
-
-Create an index.
-
-```javascript
-await storage.createIndex('users', { email: 1 }, { unique: true });
-```
-
-### Collection Management
-
-#### `listCollections()`
-
-List all collections.
-
-```javascript
-const collections = await storage.listCollections();
-// Returns: ['users', 'orders', 'products']
-```
-
-#### `dropCollection(collectionName)`
-
-Drop a collection.
-
-```javascript
-await storage.dropCollection('temp_data');
-```
-
-#### `stats()`
-
-Get database statistics.
-
-```javascript
-const stats = await storage.stats();
-// Returns database size, collection count, etc.
-```
-
-## Advanced Examples
-
-### Complex Queries
-
-```javascript
-// Find with multiple conditions
-const users = await storage.find('users', {
+// Find users between 18 and 65 who are active
+const users = await storage.get('users', {
   age: { $gte: 18, $lte: 65 },
   status: 'active',
   $or: [
@@ -280,132 +280,124 @@ const users = await storage.find('users', {
     { role: 'moderator' }
   ]
 });
-
-// Find with regex
-const users = await storage.find('users', {
-  email: { $regex: /@example\.com$/ }
-});
 ```
 
-### Aggregation Example
+## Update Operators
 
+### Field Update Operators
+- `$set` - Set field value
+- `$unset` - Remove field
+- `$inc` - Increment value
+- `$mul` - Multiply value
+- `$rename` - Rename field
+- `$min` - Update if new value is less
+- `$max` - Update if new value is greater
+
+### Array Update Operators
+- `$push` - Add element to array
+- `$pop` - Remove first/last element
+- `$pull` - Remove matching elements
+- `$addToSet` - Add unique element
+- `$pullAll` - Remove all matching
+
+**Example:**
 ```javascript
-// Get monthly revenue
-const revenue = await storage.aggregate('orders', [
+// Set and increment
+await storage.update('products',
+  { sku: 'ABC123' },
   {
-    $match: {
-      status: 'completed',
-      createdAt: {
-        $gte: new Date('2024-01-01'),
-        $lt: new Date('2025-01-01')
-      }
-    }
-  },
-  {
-    $group: {
-      _id: {
-        month: { $month: '$createdAt' },
-        year: { $year: '$createdAt' }
-      },
-      total: { $sum: '$amount' },
-      count: { $sum: 1 }
-    }
-  },
-  {
-    $sort: { '_id.year': 1, '_id.month': 1 }
+    $set: { inStock: true },
+    $inc: { quantity: 10 }
   }
-]);
+);
 ```
 
-### Transactions (MongoDB 4.0+)
+## Complete Example
 
 ```javascript
-const session = storage.client.startSession();
+const RekLogStorage = require('reklog-storage');
 
-try {
-  await session.withTransaction(async () => {
-    await storage.insert('users', { name: 'John' });
-    await storage.insert('logs', { action: 'user_created' });
-  });
-} finally {
-  await session.endSession();
+async function main() {
+  try {
+    // Initialize storage
+    const storage = new RekLogStorage('your-api-key-here');
+
+    // Insert users
+    console.log('Inserting users...');
+    await storage.insert('users', [
+      { username: 'alice', age: 25, status: 'active' },
+      { username: 'bob', age: 30, status: 'active' },
+      { username: 'charlie', age: 35, status: 'inactive' }
+    ]);
+
+    // Get active users
+    const activeUsers = await storage.get('users', { status: 'active' });
+    console.log('Active users:', activeUsers);
+
+    // Update inactive users
+    const updateResult = await storage.update('users',
+      { status: 'inactive' },
+      { $set: { status: 'active' } }
+    );
+    console.log(`Updated ${updateResult.modifiedCount} users`);
+
+    // Delete old users
+    const deleteResult = await storage.delete('users', {
+      age: { $lt: 18 }
+    });
+    console.log(`Deleted ${deleteResult.deletedCount} users`);
+
+    // Get all remaining users
+    const allUsers = await storage.getAll('users');
+    console.log(`Total users: ${allUsers.length}`);
+
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
 }
+
+main();
 ```
 
 ## Error Handling
 
 ```javascript
 try {
-  await storage.connect();
-  const users = await storage.find('users', {});
+  await storage.insert('users', { username: 'john' });
 } catch (error) {
-  console.error('Database error:', error.message);
-} finally {
-  await storage.disconnect();
+  if (error.message.includes('API key validation failed')) {
+    console.error('Invalid API key');
+  } else if (error.message.includes('Insert failed')) {
+    console.error('Failed to insert document');
+  } else {
+    console.error('Unknown error:', error.message);
+  }
 }
 ```
 
-## Using ObjectId
+## Getting Your API Key
 
-```javascript
-const { ObjectId } = require('reklog-storage');
-
-// Create new ObjectId
-const id = new ObjectId();
-
-// Convert string to ObjectId
-const userId = new ObjectId('507f1f77bcf86cd799439011');
-
-// Use in queries
-const user = await storage.findOne('users', { _id: userId });
-```
-
-## Best Practices
-
-1. **Always connect before operations:**
-   ```javascript
-   await storage.connect();
-   ```
-
-2. **Use try-finally for cleanup:**
-   ```javascript
-   try {
-     await storage.connect();
-     // Your operations
-   } finally {
-     await storage.disconnect();
-   }
-   ```
-
-3. **Use indexes for better performance:**
-   ```javascript
-   await storage.createIndex('users', { email: 1 }, { unique: true });
-   ```
-
-4. **Handle errors properly:**
-   ```javascript
-   try {
-     await storage.insert('users', document);
-   } catch (error) {
-     console.error('Insert failed:', error);
-   }
-   ```
-
-## Connection String Format
-
-```
-mongodb://[username:password@]host[:port]/database[?options]
-```
-
-Example:
-```
-mongodb://admin:password@storage.reklog.com:27017/myapp?authSource=admin
-```
+1. Sign up at [RekLog](https://reklog.com)
+2. Navigate to **Storages** in your dashboard
+3. Click **Create Storage**
+4. Copy your **Storage API Key** from the storage details page
 
 ## Requirements
 
 - Node.js 12.x or higher
-- MongoDB 4.0 or higher
+- Valid RekLog Storage API key
+
+## Security
+
+- API keys are validated automatically on initialization
+- All communication is done over HTTPS
+- Never expose your API key in public repositories
+- Use environment variables for API keys in production
+
+```javascript
+// Good practice
+const storage = new RekLogStorage(process.env.REKLOG_API_KEY);
+```
 
 ## License
 
@@ -414,6 +406,6 @@ MIT
 ## Support
 
 For issues and questions:
-- GitHub: https://github.com/reklog/reklog-storage/issues
 - Documentation: https://reklog.com/docs
+- GitHub Issues: https://github.com/frontekip/reklog-storage/issues
 - Website: https://reklog.com

@@ -1,93 +1,176 @@
 const RekLogStorage = require('./src/index');
 
 async function example() {
-  // Initialize storage
-  const storage = new RekLogStorage('mongodb://localhost:27017/testdb');
-
   try {
-    // Connect to database
-    console.log('Connecting to MongoDB...');
-    await storage.connect();
-    console.log('Connected!');
+    // Initialize storage with API key (auto-validates in background)
+    console.log('Initializing RekLog Storage...');
 
-    // Insert a document
-    console.log('\n--- Insert Example ---');
-    const user = await storage.insert('users', {
-      name: 'John Doe',
+    const storage = new RekLogStorage('x', {
+      apiUrl: 'http://localhost:3000/api'
+    });
+
+    console.log('Storage initialized. API key validation started...\n');
+
+    // --- INSERT EXAMPLES ---
+    console.log('=== INSERT EXAMPLES ===\n');
+
+    // Insert 30 random users
+    console.log('Inserting 30 random users...');
+    const users = [];
+    for (let i = 1; i <= 300; i++) {
+      users.push({
+        username: `user_${i}`,
+        email: `user${i}@example.com`,
+        age: Math.floor(Math.random() * 50) + 18,
+        status: i % 3 === 0 ? 'inactive' : 'active',
+        createdAt: new Date()
+      });
+    }
+
+    const insertResult = await storage.insert('users', users);
+    console.log(`✓ Inserted ${insertResult.insertedCount} users`);
+    console.log('Storage ID:', storage.storageId);
+    console.log('Database:', storage.databaseName);
+
+    // Insert a single user
+    console.log('\nInserting a single user...');
+    const singleUser = await storage.insert('users', {
+      username: 'john_doe',
       email: 'john@example.com',
       age: 30,
+      status: 'active',
+      createdAt: new Date()
+    });
+    console.log('✓ Inserted user with ID:', singleUser.insertedId);
+
+    // --- GET EXAMPLES ---
+    console.log('\n=== GET EXAMPLES ===\n');
+
+    // Get all users
+    console.log('Getting all users...');
+    const allUsers = await storage.getAll('users');
+    console.log(`✓ Found ${allUsers.length} total users`);
+
+    // Get active users
+    console.log('\nGetting active users...');
+    const activeUsers = await storage.get('users', {
       status: 'active'
     });
-    console.log('Inserted user:', user);
+    console.log(`✓ Found ${activeUsers.length} active users`);
 
-    // Insert multiple documents
-    console.log('\n--- Insert Many Example ---');
-    const users = await storage.insertMany('users', [
-      { name: 'Jane Smith', email: 'jane@example.com', age: 25, status: 'active' },
-      { name: 'Bob Johnson', email: 'bob@example.com', age: 35, status: 'inactive' }
-    ]);
-    console.log('Inserted users:', users.length);
+    // Get users with options (limit, sort)
+    console.log('\nGetting first 5 users sorted by username...');
+    const firstUsers = await storage.get('users', {}, {
+      limit: 5,
+      sort: { username: 1 },
+      projection: { username: 1, email: 1, status: 1 }
+    });
+    console.log('✓ First 5 users:', firstUsers);
 
-    // Find all users
-    console.log('\n--- Find Example ---');
-    const allUsers = await storage.find('users', {});
-    console.log('All users:', allUsers);
+    // Get users older than 30
+    console.log('\nGetting users older than 30...');
+    const olderUsers = await storage.get('users', {
+      age: { $gt: 30 }
+    });
+    console.log(`✓ Found ${olderUsers.length} users older than 30`);
 
-    // Find with filter
-    console.log('\n--- Find with Filter Example ---');
-    const activeUsers = await storage.find('users', { status: 'active' });
-    console.log('Active users:', activeUsers);
+    // --- UPDATE EXAMPLES ---
+    console.log('\n=== UPDATE EXAMPLES ===\n');
 
-    // Find one
-    console.log('\n--- Find One Example ---');
-    const oneUser = await storage.findOne('users', { email: 'john@example.com' });
-    console.log('Found user:', oneUser);
-
-    // Update
-    console.log('\n--- Update Example ---');
-    await storage.updateOne(
-      'users',
-      { email: 'john@example.com' },
-      { $set: { age: 31 } }
+    // Update all inactive users to active
+    console.log('Updating all inactive users to active...');
+    const updateResult = await storage.update('users',
+      { status: 'inactive' },
+      { $set: { status: 'active', updatedAt: new Date() } }
     );
-    console.log('Updated user');
+    console.log(`✓ Updated ${updateResult.modifiedCount} users (matched: ${updateResult.matchedCount})`);
 
-    // Count
-    console.log('\n--- Count Example ---');
-    const count = await storage.count('users', { status: 'active' });
-    console.log('Active users count:', count);
+    // Update specific users' age
+    console.log('\nUpdating age for users older than 60...');
+    const updateAge = await storage.update('users',
+      { age: { $gt: 60 } },
+      { $set: { age: 60, senior: true } }
+    );
+    console.log(`✓ Updated ${updateAge.modifiedCount} users to age 60`);
 
-    // Aggregate
-    console.log('\n--- Aggregate Example ---');
-    const stats = await storage.aggregate('users', [
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          avgAge: { $avg: '$age' }
-        }
-      }
-    ]);
-    console.log('User stats:', stats);
+    // Increment age for all users
+    console.log('\nIncrementing age for all users by 1...');
+    const incrementAge = await storage.update('users',
+      {},
+      { $inc: { age: 1 } }
+    );
+    console.log(`✓ Incremented age for ${incrementAge.modifiedCount} users`);
 
-    // Delete
-    console.log('\n--- Delete Example ---');
-    const deletedCount = await storage.delete('users', { status: 'inactive' });
-    console.log('Deleted users:', deletedCount);
+    // --- DELETE EXAMPLES ---
+    console.log('\n=== DELETE EXAMPLES ===\n');
 
-    // List collections
-    console.log('\n--- List Collections Example ---');
-    const collections = await storage.listCollections();
-    console.log('Collections:', collections);
+    // Delete inactive users
+    console.log('Deleting inactive users...');
+    const deleteResult = await storage.delete('users', {
+      status: 'inactive'
+    });
+    console.log(`✓ Deleted ${deleteResult.deletedCount} inactive users`);
+
+    // Delete specific users
+    console.log('\nDeleting users with username user_1 and user_2...');
+    const deleteSpecific = await storage.delete('users', {
+      username: { $in: ['user_1', 'user_2'] }
+    });
+    console.log(`✓ Deleted ${deleteSpecific.deletedCount} specific users`);
+
+    // Get final count
+    console.log('\n=== FINAL RESULTS ===\n');
+    const remainingUsers = await storage.getAll('users');
+    console.log(`✓ Remaining users: ${remainingUsers.length}`);
+
+    const activeCount = await storage.get('users', { status: 'active' });
+    console.log(`✓ Active users: ${activeCount.length}`);
 
   } catch (error) {
-    console.error('Error:', error);
-  } finally {
-    // Disconnect
-    await storage.disconnect();
-    console.log('\nDisconnected from MongoDB');
+    console.error('Error:', error.message);
   }
 }
 
-// Run example
+// Initialize with custom API URL
+async function customUrlExample() {
+  try {
+    const storage = new RekLogStorage('your-api-key-here', {
+      apiUrl: 'https://api.reklog.com/api'
+    });
+
+    console.log('Storage initialized with custom API URL!');
+
+    // Insert example
+    const result = await storage.insert('products', {
+      name: 'Laptop',
+      price: 999,
+      stock: 50
+    });
+    console.log('Inserted product:', result.insertedId);
+
+    // Get example
+    const products = await storage.get('products', { price: { $lt: 1000 } });
+    console.log('Products under $1000:', products);
+
+    // Update example
+    const updated = await storage.update('products',
+      { price: { $lt: 1000 } },
+      { $set: { onSale: true, discount: 10 } }
+    );
+    console.log('Updated products on sale:', updated.modifiedCount);
+
+    // Delete example
+    const deleted = await storage.delete('products', { stock: 0 });
+    console.log('Deleted out-of-stock products:', deleted.deletedCount);
+
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+}
+
+// Run examples
+console.log('=== RekLog Storage Examples ===\n');
 example();
+
+// Uncomment to test custom URL
+// customUrlExample();

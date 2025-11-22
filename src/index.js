@@ -1,296 +1,186 @@
-const { MongoClient, ObjectId } = require('mongodb');
+const axios = require('axios');
 
 class RekLogStorage {
-  constructor(connectionString, options = {}) {
-    if (!connectionString) {
-      throw new Error('Connection string is required');
+  constructor(apiKey, options = {}) {
+    if (!apiKey) {
+      throw new Error('API key is required');
     }
 
-    this.connectionString = connectionString;
-    this.client = null;
-    this.db = null;
-    this.options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      ...options
-    };
+    this.apiKey = apiKey;
+    this.apiUrl = (options.apiUrl || 'https://api.reklog.com/api').replace(/\/$/, ''); // Remove trailing slash
+
+    // Start validation immediately and store the promise
+    this._validationPromise = this._validateKey();
   }
 
   /**
-   * Connect to MongoDB
+   * Validate API key (internal)
    */
-  async connect() {
+  async _validateKey() {
     try {
-      this.client = new MongoClient(this.connectionString, this.options);
-      await this.client.connect();
+      const response = await axios.post(`${this.apiUrl}/storages/validate-key`, {
+        apiKey: this.apiKey
+      });
 
-      // Extract database name from connection string
-      const dbName = this.extractDatabaseName(this.connectionString);
-      this.db = this.client.db(dbName);
-
-      return true;
+      if (response.data.success) {
+        this.storageId = response.data.data.storageId;
+        this.databaseName = response.data.data.databaseName;
+        this._validated = true;
+      } else {
+        throw new Error('Invalid API key');
+      }
     } catch (error) {
-      throw new Error(`Failed to connect to MongoDB: ${error.message}`);
+      throw new Error(`API key validation failed: ${error.response?.data?.message || error.message}`);
     }
   }
 
   /**
-   * Extract database name from connection string
+   * Ensure API key is validated before operations
    */
-  extractDatabaseName(connectionString) {
-    const match = connectionString.match(/\/([^/?]+)(\?|$)/);
-    return match ? match[1] : 'test';
-  }
-
-  /**
-   * Disconnect from MongoDB
-   */
-  async disconnect() {
-    if (this.client) {
-      await this.client.close();
-      this.client = null;
-      this.db = null;
+  async _ensureValidated() {
+    if (!this._validated) {
+      await this._validationPromise;
     }
   }
 
   /**
-   * Get collection
-   */
-  getCollection(collectionName) {
-    if (!this.db) {
-      throw new Error('Not connected to MongoDB. Call connect() first.');
-    }
-    return this.db.collection(collectionName);
-  }
-
-  /**
-   * Insert a single document
-   * @param {string} collectionName - Collection name
-   * @param {object} document - Document to insert
-   * @returns {Promise<object>} Inserted document with _id
-   */
-  async insert(collectionName, document) {
-    const collection = this.getCollection(collectionName);
-    const result = await collection.insertOne(document);
-    return {
-      _id: result.insertedId,
-      ...document
-    };
-  }
-
-  /**
-   * Insert multiple documents
-   * @param {string} collectionName - Collection name
-   * @param {array} documents - Array of documents to insert
-   * @returns {Promise<array>} Inserted documents with _id
-   */
-  async insertMany(collectionName, documents) {
-    const collection = this.getCollection(collectionName);
-    const result = await collection.insertMany(documents);
-    return documents.map((doc, index) => ({
-      _id: result.insertedIds[index],
-      ...doc
-    }));
-  }
-
-  /**
-   * Find documents
-   * @param {string} collectionName - Collection name
-   * @param {object} query - Query filter
-   * @param {object} options - Query options (projection, sort, limit, skip)
+   * Get documents from a collection
+   * @param {string} collection - Collection name
+   * @param {object} query - Query filter (optional, default: {})
+   * @param {object} options - Query options (limit, skip, sort, projection)
    * @returns {Promise<array>} Array of documents
    */
-  async find(collectionName, query = {}, options = {}) {
-    const collection = this.getCollection(collectionName);
-    const cursor = collection.find(query);
+  async get(collection, query = {}, options = {}) {
+    try {
+      // Ensure validation is complete
+      await this._ensureValidated();
 
-    // Apply options
-    if (options.projection) {
-      cursor.project(options.projection);
+      const response = await axios.post(`${this.apiUrl}/storages/data/find`, {
+        apiKey: this.apiKey,
+        collection,
+        query,
+        options
+      });
+
+      if (response.data.success) {
+        return response.data.data.documents;
+      }
+
+      throw new Error(response.data.message || 'Failed to get documents');
+    } catch (error) {
+      throw new Error(`Get failed: ${error.response?.data?.message || error.message}`);
     }
-    if (options.sort) {
-      cursor.sort(options.sort);
+  }
+
+  /**
+   * Get all documents from a collection
+   * @param {string} collection - Collection name
+   * @param {object} options - Query options (limit, skip, sort, projection)
+   * @returns {Promise<array>} Array of all documents
+   */
+  async getAll(collection, options = {}) {
+    try {
+      // Ensure validation is complete
+      await this._ensureValidated();
+
+      const response = await axios.post(`${this.apiUrl}/storages/data/findAll`, {
+        apiKey: this.apiKey,
+        collection,
+        options
+      });
+
+      if (response.data.success) {
+        return response.data.data.documents;
+      }
+
+      throw new Error(response.data.message || 'Failed to get documents');
+    } catch (error) {
+      throw new Error(`Get all failed: ${error.response?.data?.message || error.message}`);
     }
-    if (options.limit) {
-      cursor.limit(options.limit);
+  }
+
+  /**
+   * Insert one or multiple documents into a collection
+   * @param {string} collection - Collection name
+   * @param {object|array} documents - Document(s) to insert (single object or array of objects)
+   * @returns {Promise<object>} Insert result with insertedId(s)
+   */
+  async insert(collection, documents) {
+    try {
+      // Ensure validation is complete
+      await this._ensureValidated();
+
+      const response = await axios.post(`${this.apiUrl}/storages/data/insert`, {
+        apiKey: this.apiKey,
+        collection,
+        documents
+      });
+
+      if (response.data.success) {
+        return response.data.data;
+      }
+
+      throw new Error(response.data.message || 'Failed to insert documents');
+    } catch (error) {
+      throw new Error(`Insert failed: ${error.response?.data?.message || error.message}`);
     }
-    if (options.skip) {
-      cursor.skip(options.skip);
+  }
+
+  /**
+   * Delete documents from a collection
+   * @param {string} collection - Collection name
+   * @param {object} query - Query filter to match documents to delete
+   * @returns {Promise<object>} Delete result with deletedCount
+   */
+  async delete(collection, query = {}) {
+    try {
+      // Ensure validation is complete
+      await this._ensureValidated();
+
+      const response = await axios.post(`${this.apiUrl}/storages/data/delete`, {
+        apiKey: this.apiKey,
+        collection,
+        query
+      });
+
+      if (response.data.success) {
+        return response.data.data;
+      }
+
+      throw new Error(response.data.message || 'Failed to delete documents');
+    } catch (error) {
+      throw new Error(`Delete failed: ${error.response?.data?.message || error.message}`);
     }
-
-    return await cursor.toArray();
   }
 
   /**
-   * Find one document
-   * @param {string} collectionName - Collection name
-   * @param {object} query - Query filter
-   * @param {object} options - Query options (projection)
-   * @returns {Promise<object|null>} Document or null
+   * Update documents in a collection
+   * @param {string} collection - Collection name
+   * @param {object} query - Query filter to match documents to update
+   * @param {object} update - Update operations (e.g., { $set: { field: value } })
+   * @returns {Promise<object>} Update result with matchedCount and modifiedCount
    */
-  async findOne(collectionName, query = {}, options = {}) {
-    const collection = this.getCollection(collectionName);
-    return await collection.findOne(query, options);
-  }
+  async update(collection, query = {}, update) {
+    try {
+      // Ensure validation is complete
+      await this._ensureValidated();
 
-  /**
-   * Find document by ID
-   * @param {string} collectionName - Collection name
-   * @param {string} id - Document ID
-   * @returns {Promise<object|null>} Document or null
-   */
-  async findById(collectionName, id) {
-    return await this.findOne(collectionName, { _id: new ObjectId(id) });
-  }
+      const response = await axios.post(`${this.apiUrl}/storages/data/update`, {
+        apiKey: this.apiKey,
+        collection,
+        query,
+        update
+      });
 
-  /**
-   * Update documents
-   * @param {string} collectionName - Collection name
-   * @param {object} query - Query filter
-   * @param {object} update - Update operations
-   * @param {object} options - Update options
-   * @returns {Promise<object>} Update result
-   */
-  async update(collectionName, query, update, options = {}) {
-    const collection = this.getCollection(collectionName);
-    const result = await collection.updateMany(query, update, options);
-    return {
-      matchedCount: result.matchedCount,
-      modifiedCount: result.modifiedCount
-    };
-  }
+      if (response.data.success) {
+        return response.data.data;
+      }
 
-  /**
-   * Update one document
-   * @param {string} collectionName - Collection name
-   * @param {object} query - Query filter
-   * @param {object} update - Update operations
-   * @param {object} options - Update options
-   * @returns {Promise<object>} Update result
-   */
-  async updateOne(collectionName, query, update, options = {}) {
-    const collection = this.getCollection(collectionName);
-    const result = await collection.updateOne(query, update, options);
-    return {
-      matchedCount: result.matchedCount,
-      modifiedCount: result.modifiedCount
-    };
-  }
-
-  /**
-   * Update document by ID
-   * @param {string} collectionName - Collection name
-   * @param {string} id - Document ID
-   * @param {object} update - Update operations
-   * @returns {Promise<object>} Update result
-   */
-  async updateById(collectionName, id, update) {
-    return await this.updateOne(collectionName, { _id: new ObjectId(id) }, update);
-  }
-
-  /**
-   * Delete documents
-   * @param {string} collectionName - Collection name
-   * @param {object} query - Query filter
-   * @returns {Promise<number>} Number of deleted documents
-   */
-  async delete(collectionName, query) {
-    const collection = this.getCollection(collectionName);
-    const result = await collection.deleteMany(query);
-    return result.deletedCount;
-  }
-
-  /**
-   * Delete one document
-   * @param {string} collectionName - Collection name
-   * @param {object} query - Query filter
-   * @returns {Promise<number>} Number of deleted documents (0 or 1)
-   */
-  async deleteOne(collectionName, query) {
-    const collection = this.getCollection(collectionName);
-    const result = await collection.deleteOne(query);
-    return result.deletedCount;
-  }
-
-  /**
-   * Delete document by ID
-   * @param {string} collectionName - Collection name
-   * @param {string} id - Document ID
-   * @returns {Promise<number>} Number of deleted documents (0 or 1)
-   */
-  async deleteById(collectionName, id) {
-    return await this.deleteOne(collectionName, { _id: new ObjectId(id) });
-  }
-
-  /**
-   * Count documents
-   * @param {string} collectionName - Collection name
-   * @param {object} query - Query filter
-   * @returns {Promise<number>} Number of documents
-   */
-  async count(collectionName, query = {}) {
-    const collection = this.getCollection(collectionName);
-    return await collection.countDocuments(query);
-  }
-
-  /**
-   * Aggregate
-   * @param {string} collectionName - Collection name
-   * @param {array} pipeline - Aggregation pipeline
-   * @returns {Promise<array>} Aggregation result
-   */
-  async aggregate(collectionName, pipeline) {
-    const collection = this.getCollection(collectionName);
-    return await collection.aggregate(pipeline).toArray();
-  }
-
-  /**
-   * Create index
-   * @param {string} collectionName - Collection name
-   * @param {object} keys - Index keys
-   * @param {object} options - Index options
-   * @returns {Promise<string>} Index name
-   */
-  async createIndex(collectionName, keys, options = {}) {
-    const collection = this.getCollection(collectionName);
-    return await collection.createIndex(keys, options);
-  }
-
-  /**
-   * Drop collection
-   * @param {string} collectionName - Collection name
-   * @returns {Promise<boolean>} Success
-   */
-  async dropCollection(collectionName) {
-    const collection = this.getCollection(collectionName);
-    return await collection.drop();
-  }
-
-  /**
-   * List collections
-   * @returns {Promise<array>} Array of collection names
-   */
-  async listCollections() {
-    if (!this.db) {
-      throw new Error('Not connected to MongoDB. Call connect() first.');
+      throw new Error(response.data.message || 'Failed to update documents');
+    } catch (error) {
+      throw new Error(`Update failed: ${error.response?.data?.message || error.message}`);
     }
-    const collections = await this.db.listCollections().toArray();
-    return collections.map(col => col.name);
-  }
-
-  /**
-   * Get database stats
-   * @returns {Promise<object>} Database statistics
-   */
-  async stats() {
-    if (!this.db) {
-      throw new Error('Not connected to MongoDB. Call connect() first.');
-    }
-    return await this.db.stats();
   }
 }
-
-// Export ObjectId for convenience
-RekLogStorage.ObjectId = ObjectId;
 
 module.exports = RekLogStorage;

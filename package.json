@@ -13,7 +13,7 @@
   "author": "Yaşar İçli <yasaricli@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "mongodb": "^4.17.2"
+    "axios": "^1.6.0"
   },
   "repository": {
     "type": "git",
