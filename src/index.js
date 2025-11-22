@@ -8,6 +8,7 @@ class RekLogStorage {
 
     this.apiKey = apiKey;
     this.apiUrl = (options.apiUrl || 'https://api.reklog.com/api').replace(/\/$/, ''); // Remove trailing slash
+    this.environment = options.environment || 'development'; // Default to development
 
     // Start validation immediately and store the promise
     this._validationPromise = this._validateKey();
@@ -25,6 +26,13 @@ class RekLogStorage {
       if (response.data.success) {
         this.storageId = response.data.data.storageId;
         this.databaseName = response.data.data.databaseName;
+        this.environments = response.data.data.environments || ['development'];
+
+        // Validate that the requested environment exists
+        if (!this.environments.includes(this.environment)) {
+          throw new Error(`Environment '${this.environment}' not found. Available environments: ${this.environments.join(', ')}`);
+        }
+
         this._validated = true;
       } else {
         throw new Error('Invalid API key');
@@ -57,6 +65,7 @@ class RekLogStorage {
 
       const response = await axios.post(`${this.apiUrl}/storages/data/find`, {
         apiKey: this.apiKey,
+        environment: this.environment,
         collection,
         query,
         options
@@ -85,6 +94,7 @@ class RekLogStorage {
 
       const response = await axios.post(`${this.apiUrl}/storages/data/findAll`, {
         apiKey: this.apiKey,
+        environment: this.environment,
         collection,
         options
       });
@@ -112,6 +122,7 @@ class RekLogStorage {
 
       const response = await axios.post(`${this.apiUrl}/storages/data/insert`, {
         apiKey: this.apiKey,
+        environment: this.environment,
         collection,
         documents
       });
@@ -139,6 +150,7 @@ class RekLogStorage {
 
       const response = await axios.post(`${this.apiUrl}/storages/data/delete`, {
         apiKey: this.apiKey,
+        environment: this.environment,
         collection,
         query
       });
@@ -167,6 +179,7 @@ class RekLogStorage {
 
       const response = await axios.post(`${this.apiUrl}/storages/data/update`, {
         apiKey: this.apiKey,
+        environment: this.environment,
         collection,
         query,
         update

@@ -5,11 +5,14 @@ async function example() {
     // Initialize storage with API key (auto-validates in background)
     console.log('Initializing RekLog Storage...');
 
+    // Using development environment (default)
     const storage = new RekLogStorage('x', {
-      apiUrl: 'http://localhost:3000/api'
+      apiUrl: 'http://localhost:3000/api',
+      environment: 'development'  // Can be 'production', 'staging', etc.
     });
 
-    console.log('Storage initialized. API key validation started...\n');
+    console.log('Storage initialized. API key validation started...');
+    console.log('Environment: development\n');
 
     // --- INSERT EXAMPLES ---
     console.log('=== INSERT EXAMPLES ===\n');
@@ -131,14 +134,59 @@ async function example() {
   }
 }
 
+// Environment examples
+async function environmentExample() {
+  try {
+    // Development environment
+    const devStorage = new RekLogStorage('your-api-key-here', {
+      environment: 'development'
+    });
+
+    // Production environment
+    const prodStorage = new RekLogStorage('your-api-key-here', {
+      environment: 'production'
+    });
+
+    console.log('\n=== ENVIRONMENT EXAMPLES ===\n');
+
+    // Insert to development
+    await devStorage.insert('users', {
+      username: 'dev_user',
+      email: 'dev@example.com',
+      environment: 'development'
+    });
+    console.log('✓ Inserted to development environment');
+
+    // Insert to production
+    await prodStorage.insert('users', {
+      username: 'prod_user',
+      email: 'prod@example.com',
+      environment: 'production'
+    });
+    console.log('✓ Inserted to production environment');
+
+    // Get from development
+    const devUsers = await devStorage.getAll('users');
+    console.log(`✓ Development has ${devUsers.length} users`);
+
+    // Get from production
+    const prodUsers = await prodStorage.getAll('users');
+    console.log(`✓ Production has ${prodUsers.length} users`);
+
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+}
+
 // Initialize with custom API URL
 async function customUrlExample() {
   try {
     const storage = new RekLogStorage('your-api-key-here', {
-      apiUrl: 'https://api.reklog.com/api'
+      apiUrl: 'https://api.reklog.com/api',
+      environment: 'production'
     });
 
-    console.log('Storage initialized with custom API URL!');
+    console.log('Storage initialized with custom API URL and production environment!');
 
     // Insert example
     const result = await storage.insert('products', {
@@ -171,6 +219,9 @@ async function customUrlExample() {
 // Run examples
 console.log('=== RekLog Storage Examples ===\n');
 example();
+
+// Uncomment to test environments
+// environmentExample();
 
 // Uncomment to test custom URL
 // customUrlExample();

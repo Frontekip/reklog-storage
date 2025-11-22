@@ -20,7 +20,13 @@ yarn add reklog-storage
 const RekLogStorage = require('reklog-storage');
 
 // Initialize with your API key (auto-validates)
+// Default environment is 'development'
 const storage = new RekLogStorage('your-api-key-here');
+
+// Or specify a different environment (production, staging, test, etc.)
+const prodStorage = new RekLogStorage('your-api-key-here', {
+  environment: 'production'
+});
 
 // Insert documents
 await storage.insert('users', {
@@ -62,15 +68,22 @@ new RekLogStorage(apiKey, options)
 **Parameters:**
 - `apiKey` (string, required): Your storage API key from RekLog dashboard
 - `options` (object, optional):
+  - `environment` (string): Environment to use - must match one of the environments created with your storage (default: `'development'`)
   - `apiUrl` (string): Custom API URL (default: `https://api.reklog.com/api`)
 
 **Example:**
 ```javascript
-// With default API URL
+// With default environment (development)
 const storage = new RekLogStorage('your-api-key-here');
 
-// With custom API URL
-const storage = new RekLogStorage('your-api-key-here', {
+// With production environment
+const prodStorage = new RekLogStorage('your-api-key-here', {
+  environment: 'production'
+});
+
+// With custom environment and API URL
+const stagingStorage = new RekLogStorage('your-api-key-here', {
+  environment: 'staging',
   apiUrl: 'https://api.reklog.com/api'
 });
 ```
@@ -375,12 +388,51 @@ try {
 }
 ```
 
+## Environments
+
+RekLog Storage supports multiple environments for the same storage instance. This allows you to separate your development, staging, and production data while using a single API key.
+
+### Creating Storage with Environments
+
+When creating a storage in the RekLog dashboard:
+1. Enter your storage name
+2. Add environments (e.g., `development`, `production`, `staging`, `test`)
+3. Each environment will have its own database: `dbname-environment`
+
+**Example:**
+- Storage name: `my-app`
+- Environments: `development`, `production`, `staging`
+- Databases created: `my-app-development`, `my-app-production`, `my-app-staging`
+
+### Using Different Environments
+
+```javascript
+// Development environment (default)
+const devStorage = new RekLogStorage('your-api-key');
+
+// Production environment
+const prodStorage = new RekLogStorage('your-api-key', {
+  environment: 'production'
+});
+
+// Staging environment
+const stagingStorage = new RekLogStorage('your-api-key', {
+  environment: 'staging'
+});
+
+// Each instance connects to its own database
+await devStorage.insert('users', { name: 'Dev User' });      // Goes to my-app-development
+await prodStorage.insert('users', { name: 'Prod User' });    // Goes to my-app-production
+await stagingStorage.insert('users', { name: 'Stage User' }); // Goes to my-app-staging
+```
+
 ## Getting Your API Key
 
 1. Sign up at [RekLog](https://reklog.com)
 2. Navigate to **Storages** in your dashboard
 3. Click **Create Storage**
-4. Copy your **Storage API Key** from the storage details page
+4. Enter storage name and environments
+5. Copy your **Storage API Key** from the storage details page
 
 ## Requirements
 
