@@ -1,7 +1,7 @@
 {
   "name": "reklog-storage",
-  "version": "0.0.1",
-  "description": "Simple MongoDB wrapper for RekLog Storage - Connect to dedicated MongoDB instances",
+  "version": "0.0.2",
+  "description": "Simple and secure API client for RekLog Storage - Access your dedicated database instances with API keys",
   "main": "src/index.js",
   "keywords": [
     "mongodb",
